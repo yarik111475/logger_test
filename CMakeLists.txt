@@ -11,6 +11,36 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(UNIX AND NOT APPLE)
+    set(LINUX TRUE)
+endif()
+
+#boost
+if(WIN32)
+    set(BOOST_ROOT "C:/boost_1_76_0")
+    set(BOOST_INCLUDEDIR "C:/boost_1_76_0/boost")
+    set(BOOST_LIBRARYDIR "C:/boost_1_76_0/stage/lib")
+endif()
+
+if(LINUX)
+    set(BOOST_ROOT "/usr")
+    set(BOOST_INCLUDEDIR "/usr/include")
+    set(BOOST_LIBRARYDIR "/usr/lib")
+endif()
+
+set(Boost_DEBUG 1)
+set(Boost_USE_STATIC_LIBS ON)
+
+add_definitions( -DHAS_BOOST )
+
+find_package(Boost COMPONENTS
+    chrono
+    thread
+    date_time
+    filesystem
+    program_options
+)
+
 find_package(Qt5 REQUIRED COMPONENTS Core)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
@@ -26,9 +56,14 @@ add_executable(logger_test
     ${PROJECT_SOURCES}
 )
 
+target_include_directories(logger_test PRIVATE
+    ${Boost_INCLUDE_DIRS}
+)
+
 target_link_libraries(logger_test PRIVATE
     Qt5::Core
     Qt5::Widgets
+    ${Boost_LIBRARIES}
 )
 
 
