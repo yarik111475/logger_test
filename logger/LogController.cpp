@@ -1,5 +1,9 @@
 #include "LogController.h"
-#include <boost/bind.hpp>
+
+#include <boost/tokenizer.hpp>
+#include <boost/bind/bind.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/operations.hpp>
 
 void LogController::run()
 {
@@ -37,6 +41,31 @@ void LogController::emplace_task()
 
 void LogController::execute_task()
 {
+    boost::filesystem::directory_iterator begin(log_path_);
+    boost::filesystem::directory_iterator end;
+    std::vector<std::string> file_list;
+
+    //parse directory
+    while(begin!=end){
+        const auto& status {begin->status()};
+        if(status.type()==boost::filesystem::regular_file){
+            const std::string file_name {begin->path().filename().string()};
+            file_list.push_back(file_name);
+        }
+        ++begin;
+    }
+
+    //iterate all found files
+    for(int i=0;i<file_list.size();++i){
+        std::vector<std::string> file_parts;
+        boost::char_separator<char> sep(".");
+        boost::tokenizer<boost::char_separator<char>> tokens(file_list.at(i),sep);
+        //split file name to parts
+        for(const std::string& token: tokens){
+            file_parts.push_back(token);
+            log_func_(std::to_string(file_parts.size()));
+        }
+    }
     const std::string msg {"task executed"};
     if(log_func_){
         log_func_(msg);

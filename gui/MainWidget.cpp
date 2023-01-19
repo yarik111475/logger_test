@@ -16,7 +16,7 @@ MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 
     QPushButton* start_btn_ptr=new QPushButton("Start");
     QObject::connect(start_btn_ptr, &QPushButton::clicked,[this](){
-        log_controller_ptr_.reset(new LogController(1000,std::string {""}));
+        log_controller_ptr_.reset(new LogController(1000,std::string {"/home/yaroslav/00_install_x86_64_ci_out/bin"}));
         log_controller_ptr_->set_log_func(std::bind(&MainWidget::callback,this,std::placeholders::_1));
         log_controller_ptr_->start();
     });

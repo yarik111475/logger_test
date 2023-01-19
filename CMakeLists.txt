@@ -11,6 +11,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+
 if(UNIX AND NOT APPLE)
     set(LINUX TRUE)
 endif()
@@ -31,12 +32,14 @@ endif()
 set(Boost_DEBUG 1)
 set(Boost_USE_STATIC_LIBS ON)
 
-add_definitions( -DHAS_BOOST )
+add_definitions(-DHAS_BOOST)
+add_definitions(-DBOOST_NO_CXX11_SCOPED_ENUMS)
 
-find_package(Boost COMPONENTS
+find_package(Boost 1.76.0 EXACT COMPONENTS
     chrono
     thread
     date_time
+    system
     filesystem
     program_options
 )
