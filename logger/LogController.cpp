@@ -1,5 +1,6 @@
 #include "LogController.h"
 
+#include <boost/format.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/bind/bind.hpp>
 #include <boost/filesystem.hpp>
@@ -41,33 +42,58 @@ void LogController::emplace_task()
 
 void LogController::execute_task()
 {
-    boost::filesystem::directory_iterator begin(log_path_);
+    const boost::filesystem::path path {log_path_};
+    if(!boost::filesystem::exists(path)){
+        if(log_func_){
+            log_func_((boost::format("LogController::execute_task():path '%1%' not exists!")
+                                    % path).str());
+        }
+        stop();
+        return;
+    }
+    boost::filesystem::directory_iterator begin(path);
     boost::filesystem::directory_iterator end;
-    std::vector<std::string> file_list;
+    std::map<std::string, std::string> file_map;
 
     //parse directory
     while(begin!=end){
         const auto& status {begin->status()};
         if(status.type()==boost::filesystem::regular_file){
+            const std::string& file_path {begin->path().string()};
             const std::string file_name {begin->path().filename().string()};
-            file_list.push_back(file_name);
+            file_map.emplace(file_name,file_path);
         }
         ++begin;
     }
 
     //iterate all found files
-    for(int i=0;i<file_list.size();++i){
-        std::vector<std::string> file_parts;
+    auto map_begin {file_map.begin()};
+    while(map_begin!=file_map.end()){
+        const std::string& file_name {map_begin->first};
+        const std::string& file_path {map_begin->second};
+
         boost::char_separator<char> sep(".");
-        boost::tokenizer<boost::char_separator<char>> tokens(file_list.at(i),sep);
-        //split file name to parts
-        for(const std::string& token: tokens){
-            file_parts.push_back(token);
+        boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
+        //check tokens count in file_name
+        const size_t tokens_count=std::distance(tokens.begin(),tokens.end());
+        if(tokens_count==2){
+            operate_file(file_name,file_path);
         }
-        log_func_(std::to_string(file_parts.size()));
+        ++map_begin;
     }
-    const std::string msg {"task executed"};
+
+    const std::string msg {"LogController::execute_task(): task executed"};
     if(log_func_){
+        log_func_(msg);
+    }
+}
+
+void LogController::operate_file(const std::string &file_name, const std::string &file_path)
+{
+    if(log_func_){
+        const std::string& msg {(boost::format("LogController::operate_file(): operate with file: '%1%', path: '%2%'")
+                    % file_name
+                    % file_path).str()};
         log_func_(msg);
     }
 }
@@ -106,7 +132,7 @@ void LogController::start()
     }));
 
     started_=true;
-    const std::string msg {"started"};
+    const std::string msg {"LogController::start(): started"};
     if(log_func_){
         log_func_(msg);
     }
@@ -120,6 +146,7 @@ void LogController::stop()
     io_service_.stop();
     if(asio_thread_ptr_ && asio_thread_ptr_->joinable()){
         asio_thread_ptr_->detach();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     std::lock_guard<std::mutex> lock(mtx_);
@@ -129,10 +156,11 @@ void LogController::stop()
 
     if(thread_ptr_ && thread_ptr_->joinable()){
         thread_ptr_->detach();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     started_=false;
-    const std::string msg {"stopped"};
+    const std::string msg {"LogController::stop(): stopped"};
     if(log_func_){
         log_func_(msg);
     }

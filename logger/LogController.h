@@ -39,6 +39,7 @@ private:
 //public:
     void emplace_task();
     void execute_task();
+    void operate_file(const std::string& file_name,const std::string& file_path);
 
 public:
     explicit LogController(int interval, const std::string& log_path);

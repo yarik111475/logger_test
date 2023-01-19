@@ -1,8 +1,10 @@
 #include <QDebug>
+#include <QtGlobal>
 #include <QPushButton>
 #include <QHBoxLayout>
 
 #include "MainWidget.h"
+#include <logger/Controller.h>
 #include "logger/LogController.h"
 
 void MainWidget::callback(const std::string &msg)
@@ -13,12 +15,21 @@ void MainWidget::callback(const std::string &msg)
 MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 {
 
-
+#ifdef Q_OS_LINUX
+    log_path_="/home/yaroslav/Qt/projects/tests/UnixDaemon/src";
+#endif
+#ifdef Q_OS_WINDOWS
+    log_path_="";
+#endif
     QPushButton* start_btn_ptr=new QPushButton("Start");
     QObject::connect(start_btn_ptr, &QPushButton::clicked,[this](){
-        log_controller_ptr_.reset(new LogController(1000,std::string {"C:\\var\\log\\usagent_tray"}));
+        log_controller_ptr_.reset(new LogController(1000,std::string{log_path_}));
         log_controller_ptr_->set_log_func(std::bind(&MainWidget::callback,this,std::placeholders::_1));
         log_controller_ptr_->start();
+
+        //controller_ptr_.reset(new Controller(1000,QString{}));
+        //controller_ptr_->set_log_func(std::bind(&MainWidget::callback,this,std::placeholders::_1));
+        //controller_ptr_->start();
     });
 
     QPushButton* stop_btn_ptr=new QPushButton("Stop");

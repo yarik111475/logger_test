@@ -51,6 +51,8 @@ set(PROJECT_SOURCES
         main.cpp
         gui/MainWidget.h
         gui/MainWidget.cpp
+        logger/Controller.h
+        logger/Controller.cpp
         logger/LogController.h
         logger/LogController.cpp
 )
