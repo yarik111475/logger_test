@@ -16,8 +16,8 @@ MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 
     QPushButton* start_btn_ptr=new QPushButton("Start");
     QObject::connect(start_btn_ptr, &QPushButton::clicked,[this](){
-        log_controller_ptr_.reset(new LogController);
-        log_controller_ptr_->set_callback(std::bind(&MainWidget::callback,this,std::placeholders::_1));
+        log_controller_ptr_.reset(new LogController(1000,std::string {""}));
+        log_controller_ptr_->set_log_func(std::bind(&MainWidget::callback,this,std::placeholders::_1));
         log_controller_ptr_->start();
     });
 
@@ -31,7 +31,7 @@ MainWidget::MainWidget(QWidget *parent):QWidget{parent}
     QPushButton* emplace_btn_ptr=new QPushButton("Emplace");
     QObject::connect(emplace_btn_ptr,&QPushButton::clicked,[this](){
         if(log_controller_ptr_){
-            log_controller_ptr_->emplace_task();
+            //log_controller_ptr_->emplace_task();
         }
     });
 
