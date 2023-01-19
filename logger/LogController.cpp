@@ -29,7 +29,7 @@ void LogController::tick(const boost::system::error_code &ec)
 {
     emplace_task();
     timer_ptr_->expires_from_now(boost::posix_time::milliseconds(interval_));
-    timer_ptr_->async_wait(boost::bind(&LogController::tick,this,boost::asio::placeholders::error()));
+    timer_ptr_->async_wait(std::bind(&LogController::tick,this,std::placeholders::_1));
 }
 
 void LogController::emplace_task()
@@ -63,8 +63,8 @@ void LogController::execute_task()
         //split file name to parts
         for(const std::string& token: tokens){
             file_parts.push_back(token);
-            log_func_(std::to_string(file_parts.size()));
         }
+        log_func_(std::to_string(file_parts.size()));
     }
     const std::string msg {"task executed"};
     if(log_func_){
@@ -73,7 +73,7 @@ void LogController::execute_task()
 }
 
 LogController::LogController(int interval, const std::string &log_path)
-    :interval_{interval},log_path_{log_path}
+    :log_path_{log_path},interval_{interval}
 {
 
 }
@@ -97,7 +97,8 @@ void LogController::start()
     }));
 
     timer_ptr_.reset(new boost::asio::deadline_timer(io_service_,boost::posix_time::milliseconds(interval_)));
-    timer_ptr_->async_wait(boost::bind(&LogController::tick,this,boost::asio::placeholders::error()));
+    boost::system::error_code ec;
+    timer_ptr_->async_wait(std::bind(&LogController::tick,this,std::placeholders::_1));
 
     //start asio io_service thread
     asio_thread_ptr_.reset(new std::thread([this](){
