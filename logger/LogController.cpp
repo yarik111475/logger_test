@@ -1,5 +1,5 @@
 #include "LogController.h"
-#include "settings/AppSettings.h"
+#include "settings/Settings.h"
 
 #include <boost/format.hpp>
 #include <boost/process.hpp>
@@ -178,7 +178,7 @@ void LogController::operate_file(const std::string &file_name, const std::string
     const int& result {boost::process::system(compressor_full_path +compressor_args)};
 }
 
-LogController::LogController(std::shared_ptr<AppSettings> log_settings_ptr, const std::string &log_path, const std::string &compressor_path)
+LogController::LogController(std::shared_ptr<Settings> log_settings_ptr, const std::string &log_path, const std::string &compressor_path)
     :log_settings_ptr_{log_settings_ptr},log_path_{log_path},compressor_path_{compressor_path}
 {
     const bool& ok {boost::conversion::try_lexical_convert<int>(log_settings_ptr_->value("log.log_check_time"),interval_)};

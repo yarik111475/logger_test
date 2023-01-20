@@ -55,8 +55,10 @@ set(PROJECT_SOURCES
         #logger/Controller.cpp
         logger/LogController.h
         logger/LogController.cpp
-        settings/AppSettings.h
-        settings/AppSettings.cpp
+        settings/Settings.h
+        settings/Settings.cpp
+        #settings/AppSettings.h
+        #settings/AppSettings.cpp
 )
 
 add_executable(logger_test

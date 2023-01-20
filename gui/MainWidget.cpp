@@ -4,7 +4,7 @@
 #include <QHBoxLayout>
 
 #include "MainWidget.h"
-#include "settings/AppSettings.h"
+#include "settings/Settings.h"
 #include "logger/LogController.h"
 
 void MainWidget::callback(const std::string &msg)
@@ -14,7 +14,7 @@ void MainWidget::callback(const std::string &msg)
 
 MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 {
-    log_settings_ptr_.reset(new AppSettings("/home/yaroslav/Qt/log_files/log.conf"));
+    log_settings_ptr_.reset(new Settings("/home/yaroslav/Qt/log_files/log.conf"));
     log_settings_ptr_->set_value("log.log_level", "debug");
     //log_settings_ptr_->read_settings("/home/yaroslav/Qt/log_files/log.conf");
     //log_settings_ptr_->read_settings("C:\\log_test\\log.conf");

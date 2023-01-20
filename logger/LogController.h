@@ -12,7 +12,7 @@
 #include <boost/noncopyable.hpp>
 #include <boost/system/error_code.hpp>
 
-class AppSettings;
+class Settings;
 
 class LogController:private boost::noncopyable
 {
@@ -29,7 +29,7 @@ private:
     std::string compressor_name_ {"7zzs"};
 #endif
     //log settings from file
-    std::shared_ptr<AppSettings> log_settings_ptr_ {nullptr};
+    std::shared_ptr<Settings> log_settings_ptr_ {nullptr};
 
     //common variables
     bool started_ {false};
@@ -66,7 +66,7 @@ private:
     void operate_file(const std::string& file_name,const std::string& file_path);
 
 public:
-    explicit LogController(std::shared_ptr<AppSettings> log_settings_ptr, const std::string& log_path, const std::string& compressor_path);
+    explicit LogController(std::shared_ptr<Settings> log_settings_ptr, const std::string& log_path, const std::string& compressor_path);
     inline void set_log_func(std::function<void(const std::string& msg)> log_func){
         log_func_=log_func;
     }
