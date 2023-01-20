@@ -2,13 +2,14 @@
 #include "settings/AppSettings.h"
 
 #include <boost/format.hpp>
+#include <boost/process.hpp>
+#include <boost/convert.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/bind/bind.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/process.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/convert.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/date_time.hpp>
 
 void LogController::run()
 {
@@ -101,6 +102,7 @@ void LogController::rename_file(const std::string &file_name, const std::string 
         log_func_(msg);
     }
 
+
     boost::char_separator<char> sep(".");
     boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
     //check tokens count in file_name
@@ -179,7 +181,7 @@ void LogController::operate_file(const std::string &file_name, const std::string
 LogController::LogController(std::shared_ptr<AppSettings> log_settings_ptr, const std::string &log_path, const std::string &compressor_path)
     :log_settings_ptr_{log_settings_ptr},log_path_{log_path},compressor_path_{compressor_path}
 {
-    const bool& ok {boost::conversion::try_lexical_convert<int>(log_settings_ptr_->value("log/log_check_time"),interval_)};
+    const bool& ok {boost::conversion::try_lexical_convert<int>(log_settings_ptr_->value("log.log_check_time"),interval_)};
     if(!ok){
         interval_=1000;
     }

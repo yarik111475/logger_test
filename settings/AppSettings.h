@@ -5,10 +5,12 @@
 #include <string>
 #include <functional>
 #include <boost/noncopyable.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 class AppSettings:private boost::noncopyable
 {
 private:
+    boost::property_tree::ptree p_tree_;
     std::map<std::string,std::string> settings_map_;
     std::function<void(const std::string&)> log_func_ {nullptr};
 public:

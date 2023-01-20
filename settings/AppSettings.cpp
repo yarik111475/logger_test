@@ -2,52 +2,42 @@
 
 #include <boost/tokenizer.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/json_parser.hpp>
 
 void AppSettings::read_settings(const std::string &path)
 {
     const boost::filesystem::path& file_path(path);
     if(!boost::filesystem::exists(file_path)){
-        return;
+        std::map<std::string,std::string> default_map {
+            {"log.log_compress_time", "0"},
+            {"log.log_remove_time","0"},
+            {"log.log_check_time", "5000"},
+            {"log.max_log_size", "1024"},
+            {"log.level", ""}
+        };
+        for(const auto& pair:default_map){
+            p_tree_.put(pair.first,pair.second);
+        }
+        boost::property_tree::ini_parser::write_ini(path,p_tree_);
     }
-    boost::filesystem::ifstream in(file_path);
-    std::string line;
-    while(std::getline(in,line)){
-        //check line is empty
-        if(line.empty()){
-            continue;
-        }
-        //check line starts with '#' (comment case)
-        if(line.substr(0,1)=="#"){
-            continue;
-        }
-        //split readed line
-        std::vector<std::string> line_parts;
-        boost::split(line_parts,line,boost::is_any_of("="));
-        //check splitted results and emplace them into settings_map_
-        if(line_parts.size()==2){
-            const std::string& key {line_parts.at(0)};
-            const std::string& value {line_parts.at(1)};
-            settings_map_.emplace(key,value);
-        }
-    }
+    boost::property_tree::read_ini(path, p_tree_);
 }
 
 void AppSettings::write_settings(const std::string &path)
 {
-
+    boost::property_tree::write_ini(path,p_tree_);
 }
 
 void AppSettings::set_value(const std::string &key, const std::string &value)
 {
-    settings_map_.emplace(key,value);
+    p_tree_.put(boost::trim_copy(key),boost::trim_copy(value));
 }
 
 std::string AppSettings::value(const std::string &key) const
 {
-    const auto& found {settings_map_.find(key)};
-    if(found!=settings_map_.end()){
-        return found->second;
-    }
+    std:: string value=p_tree_.get<std::string>(key,"");
     return std::string {};
 }
