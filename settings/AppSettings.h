@@ -11,14 +11,16 @@ class AppSettings:private boost::noncopyable
 {
 private:
     boost::property_tree::ptree p_tree_;
-    std::map<std::string,std::string> settings_map_;
+    std::string file_path_ {};
     std::function<void(const std::string&)> log_func_ {nullptr};
-public:
-    explicit AppSettings()=default;
-    ~AppSettings()=default;
+    void set_default();
 
-    void read_settings(const std::string& path);
-    void write_settings(const std::string& path);
+public:
+    explicit AppSettings(const std::string& file_path);
+    ~AppSettings();
+
+    void read_settings(const std::string& file_path);
+    void write_settings(const std::string& file_path);
 
     void set_value(const std::string& key, const std::string &value);
     std::string value(const std::string& key)const;

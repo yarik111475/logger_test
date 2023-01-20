@@ -4,31 +4,46 @@
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
-void AppSettings::read_settings(const std::string &path)
+void AppSettings::set_default()
 {
-    const boost::filesystem::path& file_path(path);
-    if(!boost::filesystem::exists(file_path)){
-        const std::map<std::string,std::string>& default_map {
-            {"log.log_compress_time", "0"},
-            {"log.log_remove_time","0"},
-            {"log.log_check_time", "5000"},
-            {"log.max_log_size", "1024"},
-            {"log.level", "trace"}
-        };
-        for(const auto& pair:default_map){
-            set_value(pair.first,pair.second);
-        }
-        boost::property_tree::ini_parser::write_ini(path,p_tree_);
+    const std::map<std::string,std::string>& default_map {
+        {"log.log_compress_time", "0"},
+        {"log.log_remove_time","0"},
+        {"log.log_check_time", "5000"},
+        {"log.max_log_size", "1024"},
+        {"log.level", "trace"}
+    };
+    for(const auto& pair:default_map){
+        set_value(pair.first,pair.second);
     }
-    boost::property_tree::read_ini(path, p_tree_);
 }
 
-void AppSettings::write_settings(const std::string &path)
+AppSettings::AppSettings(const std::string &file_path):file_path_{file_path}
 {
-    boost::property_tree::write_ini(path,p_tree_);
+    read_settings(file_path_);
+}
+
+AppSettings::~AppSettings()
+{
+    write_settings(file_path_);
+}
+
+void AppSettings::read_settings(const std::string &file_path)
+{
+    if(!boost::filesystem::exists(file_path)){
+        set_default();
+        boost::property_tree::ini_parser::write_ini(file_path,p_tree_);
+    }
+    boost::property_tree::read_ini(file_path, p_tree_);
+}
+
+void AppSettings::write_settings(const std::string &file_path)
+{
+    boost::property_tree::write_ini(file_path,p_tree_);
 }
 
 void AppSettings::set_value(const std::string &key, const std::string &value)
