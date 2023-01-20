@@ -51,10 +51,12 @@ set(PROJECT_SOURCES
         main.cpp
         gui/MainWidget.h
         gui/MainWidget.cpp
-        logger/Controller.h
-        logger/Controller.cpp
+        #logger/Controller.h
+        #logger/Controller.cpp
         logger/LogController.h
         logger/LogController.cpp
+        settings/AppSettings.h
+        settings/AppSettings.cpp
 )
 
 add_executable(logger_test

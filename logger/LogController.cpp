@@ -1,9 +1,13 @@
 #include "LogController.h"
+#include "settings/AppSettings.h"
 
 #include <boost/format.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/bind/bind.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/process.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/convert.hpp>
 #include <boost/filesystem/operations.hpp>
 
 void LogController::run()
@@ -72,19 +76,73 @@ void LogController::execute_task()
         const std::string& file_name {map_begin->first};
         const std::string& file_path {map_begin->second};
 
-        boost::char_separator<char> sep(".");
-        boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
-        //check tokens count in file_name
-        const size_t tokens_count=std::distance(tokens.begin(),tokens.end());
-        if(tokens_count==2){
-            operate_file(file_name,file_path);
-        }
+        //try to rename file
+        rename_file(file_name,file_path);
+        //try to compress file
+        compress_file(file_name,file_path);
+        //try to remove file
+        remove_file(file_name,file_path);
+
         ++map_begin;
     }
 
-    const std::string msg {"LogController::execute_task(): task executed"};
+    const std::string& msg {"LogController::execute_task(): task executed"};
     if(log_func_){
         log_func_(msg);
+    }
+}
+
+void LogController::rename_file(const std::string &file_name, const std::string &file_path)
+{
+    if(log_func_){
+        const std::string& msg {(boost::format("LogController::rename_file(): try to rename file: '%1%', path: '%2%'")
+                    % file_name
+                    % file_path).str()};
+        log_func_(msg);
+    }
+
+    boost::char_separator<char> sep(".");
+    boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
+    //check tokens count in file_name
+    const size_t tokens_count=std::distance(tokens.begin(),tokens.end());
+    if(tokens_count==token_size_){
+
+    }
+}
+
+void LogController::compress_file(const std::string &file_name, const std::string &file_path)
+{
+    if(log_func_){
+        const std::string& msg {(boost::format("LogController::compress_file(): try to compress file: '%1%', path: '%2%'")
+                    % file_name
+                    % file_path).str()};
+        log_func_(msg);
+    }
+
+    boost::char_separator<char> sep(".");
+    boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
+    //check tokens count in file_name
+    const size_t tokens_count=std::distance(tokens.begin(),tokens.end());
+    if(tokens_count==token_size_){
+
+    }
+}
+
+void LogController::remove_file(const std::string &file_name, const std::string &file_path)
+{
+    if(log_func_){
+        const std::string& msg {(boost::format("LogController::remove_file(): try to remove file: '%1%', path: '%2%'")
+                    % file_name
+                    % file_path).str()};
+        log_func_(msg);
+    }
+
+    boost::char_separator<char> sep(".");
+    boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
+    //check tokens count in file_name
+    const size_t tokens_count=std::distance(tokens.begin(),tokens.end());
+    if(tokens_count==token_size_){
+
     }
 }
 
@@ -96,12 +154,35 @@ void LogController::operate_file(const std::string &file_name, const std::string
                     % file_path).str()};
         log_func_(msg);
     }
+
+    //full compressor path with file_name
+    const std::string& compressor_full_path {compressor_path_ +"/" + compressor_name_};
+
+    //check if compressor exists
+    if(!boost::filesystem::exists(compressor_full_path)){
+        if(log_func_){
+            const std::string& msg {(boost::format("LogController::operate_file(): compressor not exists', path: '%1%'")
+                        % compressor_full_path).str()};
+            log_func_(msg);
+        }
+        return;
+    }
+
+    //create result compressed files path
+    boost::filesystem::path out_path(file_path);
+    out_path=out_path.remove_filename();
+
+    const std::string& compressor_args {" a -y " + out_path.string() + "/" + file_name + ".zip "  + file_path};
+    const int& result {boost::process::system(compressor_full_path +compressor_args)};
 }
 
-LogController::LogController(int interval, const std::string &log_path)
-    :log_path_{log_path},interval_{interval}
+LogController::LogController(std::shared_ptr<AppSettings> log_settings_ptr, const std::string &log_path, const std::string &compressor_path)
+    :log_settings_ptr_{log_settings_ptr},log_path_{log_path},compressor_path_{compressor_path}
 {
-
+    const bool& ok {boost::conversion::try_lexical_convert<int>(log_settings_ptr_->value("log/log_check_time"),interval_)};
+    if(!ok){
+        interval_=1000;
+    }
 }
 
 LogController::~LogController()
@@ -118,7 +199,7 @@ void LogController::start()
     start_stop_flag_=true;
 
     //start task queue thread
-    thread_ptr_.reset(new std::thread([this](){
+    queue_thread_ptr_.reset(new std::thread([this](){
         run();
     }));
 
@@ -132,7 +213,7 @@ void LogController::start()
     }));
 
     started_=true;
-    const std::string msg {"LogController::start(): started"};
+    const std::string& msg {"LogController::start(): started"};
     if(log_func_){
         log_func_(msg);
     }
@@ -154,13 +235,13 @@ void LogController::stop()
     task_queue_.emplace('0');
     cv_.notify_one();
 
-    if(thread_ptr_ && thread_ptr_->joinable()){
-        thread_ptr_->detach();
+    if(queue_thread_ptr_ && queue_thread_ptr_->joinable()){
+        queue_thread_ptr_->detach();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     started_=false;
-    const std::string msg {"LogController::stop(): stopped"};
+    const std::string& msg {"LogController::stop(): stopped"};
     if(log_func_){
         log_func_(msg);
     }
