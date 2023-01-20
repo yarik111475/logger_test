@@ -11,15 +11,15 @@ void AppSettings::read_settings(const std::string &path)
 {
     const boost::filesystem::path& file_path(path);
     if(!boost::filesystem::exists(file_path)){
-        std::map<std::string,std::string> default_map {
+        const std::map<std::string,std::string>& default_map {
             {"log.log_compress_time", "0"},
             {"log.log_remove_time","0"},
             {"log.log_check_time", "5000"},
             {"log.max_log_size", "1024"},
-            {"log.level", ""}
+            {"log.level", "trace"}
         };
         for(const auto& pair:default_map){
-            p_tree_.put(pair.first,pair.second);
+            set_value(pair.first,pair.second);
         }
         boost::property_tree::ini_parser::write_ini(path,p_tree_);
     }

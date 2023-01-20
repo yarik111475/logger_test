@@ -15,14 +15,15 @@ void MainWidget::callback(const std::string &msg)
 MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 {
     log_settings_ptr_.reset(new AppSettings);
-    log_settings_ptr_->read_settings("/home/yaroslav/Qt/log_files/log.conf");
+    //log_settings_ptr_->read_settings("/home/yaroslav/Qt/log_files/log.conf");
+    log_settings_ptr_->read_settings("C:\\log_test\\log.conf");
 
 #ifdef Q_OS_LINUX
     log_path_="/home/yaroslav/Qt/log_files";
     compressor_path_="/home/yaroslav/Qt/3rdparty/7zip";
 #endif
 #ifdef Q_OS_WINDOWS
-    log_path_="";
+    log_path_="C:\\log_test";
 #endif
     QPushButton* start_btn_ptr=new QPushButton("Start");
     QObject::connect(start_btn_ptr, &QPushButton::clicked,[this](){
