@@ -12,7 +12,7 @@
 
 #include "MainWidget.h"
 #include "settings/LogSettings.h"
-#include "logger/LogController.h"
+#include "logger/Controller.h"
 
 void MainWidget::callback(const std::string &msg)
 {
@@ -42,7 +42,7 @@ MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 
     QPushButton* start_btn_ptr=new QPushButton("Start");
     QObject::connect(start_btn_ptr, &QPushButton::clicked,[this](){
-        log_controller_ptr_.reset(new LogController(log_settings_ptr_,log_path_,compressor_path_));
+        log_controller_ptr_.reset(new Controller(log_settings_ptr_,log_path_,compressor_path_));
         log_controller_ptr_->set_log_func(std::bind(&MainWidget::callback,this,std::placeholders::_1));
         log_controller_ptr_->start();
 

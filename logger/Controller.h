@@ -1,46 +1,54 @@
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
-#include <queue>
 #include <memory>
-#include <thread>
-#include <mutex>
-#include <functional>
-#include <condition_variable>
-#include <QThread>
+#include <boost/asio.hpp>
+#include <boost/noncopyable.hpp>
 
-class QTimer;
+class Settings;
 
-class Controller : public QThread
+class Controller:private boost::noncopyable
 {
-    Q_OBJECT
 private:
+    //compressor variables
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    std::string compressor_name_ {"7za.exe"};
+#endif
+
+#if defined(__linux) || defined(__linux__) || defined(__gnu_linux__)
+    std::string compressor_name_ {"7zzs"};
+#endif
+    //common variables
     int interval_ {};
-    QString log_path_ {};
-    bool start_stop_flag_ {false};
     bool started_ {false};
-    std::mutex mtx_;
-    std::queue<char> task_queue_;
-    std::condition_variable cv_;
-    std::shared_ptr<QTimer> timer_ptr_ {nullptr};
+    std::string log_path_ {};
+    std::string log_file_name_ {};
+    std::string compressor_path_ {};
+    std::shared_ptr<Settings> log_settings_ptr_ {nullptr};
     std::function<void(const std::string& msg)> log_func_ {nullptr};
 
-private slots:
-    void slot_timeout();
-    void slot_execute_task();
+    //boost variables
+    boost::asio::io_service io_service_;
+    std::shared_ptr<std::thread> asio_thread_ptr_ {nullptr};
+    std::shared_ptr<boost::asio::deadline_timer> timer_ptr_ {nullptr};
+
+    void tick(const boost::system::error_code& ec);
+    void execute_task();
+
+    //file operations
+    void rename_file(const std::string& file_name,const std::string& file_path);
+    void compress_file(const std::string& file_name,const std::string& file_path);
+    void remove_file(const std::string& file_name,const std::string& file_path);
 
 public:
-    explicit Controller(int interval, const QString& log_path, QObject* parent=nullptr);
-    virtual ~Controller();
-    void start();
-    void stop();
-
+    explicit Controller(std::shared_ptr<Settings> log_settings_ptr, const std::string& log_path, const std::string& compressor_path);
     inline void set_log_func(std::function<void(const std::string& msg)> log_func){
         log_func_=log_func;
     }
+    ~Controller();
 
-protected:
-    virtual void run()override;
+    void start();
+    void stop();
 };
 
 #endif // CONTROLLER_H

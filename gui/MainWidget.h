@@ -5,6 +5,7 @@
 #include <QWidget>
 
 class Settings;
+class Controller;
 class LogController;
 
 class MainWidget:public QWidget
@@ -14,7 +15,7 @@ private:
     std::string log_path_ {};
     std::string compressor_path_ {};
     std::shared_ptr<Settings> log_settings_ptr_ {nullptr};
-    boost::shared_ptr<LogController> log_controller_ptr_ {nullptr};
+    boost::shared_ptr<Controller> log_controller_ptr_ {nullptr};
 
     void callback(const std::string& msg);
 public:
