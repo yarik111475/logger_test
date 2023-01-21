@@ -3,8 +3,15 @@
 #include <QPushButton>
 #include <QHBoxLayout>
 
+#include <boost/format.hpp>
+#include <boost/date_time.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/local_time_adjustor.hpp>
+#include <boost/date_time/c_local_time_adjustor.hpp>
+
 #include "MainWidget.h"
-#include "settings/Settings.h"
+#include "settings/LogSettings.h"
 #include "logger/LogController.h"
 
 void MainWidget::callback(const std::string &msg)
@@ -14,10 +21,6 @@ void MainWidget::callback(const std::string &msg)
 
 MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 {
-    log_settings_ptr_.reset(new Settings("/home/yaroslav/Qt/log_files/log.conf"));
-    log_settings_ptr_->set_value("log.log_level", "debug");
-    //log_settings_ptr_->read_settings("/home/yaroslav/Qt/log_files/log.conf");
-    //log_settings_ptr_->read_settings("C:\\log_test\\log.conf");
 
 #ifdef Q_OS_LINUX
     log_path_="/home/yaroslav/Qt/log_files";
@@ -26,6 +29,17 @@ MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 #ifdef Q_OS_WINDOWS
     log_path_="C:\\log_test";
 #endif
+
+
+    log_settings_ptr_.reset(new LogSettings(log_path_ + "/" + settings_filename_));
+    log_settings_ptr_->read_settings();
+    log_settings_ptr_->set_value("log.level", "debug");
+
+    const time_t time=boost::filesystem::creation_time(log_path_ + "/" + settings_filename_);
+    boost::posix_time::ptime pt=boost::posix_time::from_time_t(time);
+    pt=boost::date_time::c_local_adjustor<boost::posix_time::ptime>::utc_to_local(pt);
+    std::string s=boost::posix_time::to_iso_extended_string(pt);
+
     QPushButton* start_btn_ptr=new QPushButton("Start");
     QObject::connect(start_btn_ptr, &QPushButton::clicked,[this](){
         log_controller_ptr_.reset(new LogController(log_settings_ptr_,log_path_,compressor_path_));

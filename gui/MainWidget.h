@@ -10,6 +10,7 @@ class LogController;
 class MainWidget:public QWidget
 {
 private:
+    const std::string settings_filename_ {"log.conf"};
     std::string log_path_ {};
     std::string compressor_path_ {};
     std::shared_ptr<Settings> log_settings_ptr_ {nullptr};

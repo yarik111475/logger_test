@@ -1,7 +1,6 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#include <map>
 #include <string>
 #include <functional>
 #include <boost/noncopyable.hpp>
@@ -13,14 +12,14 @@ protected:
     boost::property_tree::ptree p_tree_;
     std::string file_path_ {};
     std::function<void(const std::string&)> log_func_ {nullptr};
-    void set_default();
+    virtual void init_default()=0;
 
 public:
     explicit Settings(const std::string& file_path);
     ~Settings();
 
-    void read_settings(const std::string& file_path);
-    void write_settings(const std::string& file_path);
+    void read_settings();
+    void write_settings();
 
     void set_value(const std::string& key, const std::string &value);
     std::string value(const std::string& key)const;

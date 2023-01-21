@@ -181,9 +181,15 @@ void LogController::operate_file(const std::string &file_name, const std::string
 LogController::LogController(std::shared_ptr<Settings> log_settings_ptr, const std::string &log_path, const std::string &compressor_path)
     :log_settings_ptr_{log_settings_ptr},log_path_{log_path},compressor_path_{compressor_path}
 {
-    const bool& ok {boost::conversion::try_lexical_convert<int>(log_settings_ptr_->value("log.log_check_time"),interval_)};
-    if(!ok){
+    //create check period
+    const bool& interval_ok {boost::conversion::try_lexical_convert<int>(log_settings_ptr_->value("log.check_period"),interval_)};
+    if(!interval_ok){
         interval_=1000;
+    }
+    //crete log filename
+    const bool filename_ok {boost::conversion::try_lexical_convert<std::string>(log_settings_ptr->value("log.file_name"),log_file_name_)};
+    if(!filename_ok){
+        log_file_name_="log.txt";
     }
 }
 

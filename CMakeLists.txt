@@ -57,6 +57,8 @@ set(PROJECT_SOURCES
         logger/LogController.cpp
         settings/Settings.h
         settings/Settings.cpp
+        settings/LogSettings.h
+        settings/LogSettings.cpp
         #settings/AppSettings.h
         #settings/AppSettings.cpp
 )

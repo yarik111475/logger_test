@@ -42,6 +42,7 @@ private:
 
     int interval_ {};
     std::string log_path_ {};
+    std::string log_file_name_ {};
     std::string compressor_path_ {};
 
     //boost variables
