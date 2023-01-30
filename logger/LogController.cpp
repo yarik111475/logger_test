@@ -36,7 +36,7 @@ void LogController::execute_task()
         //log
         if(log_func_){
             const std::string& msg {(boost::format("LogController::execute_task(): path %1% not exists!")
-                        % std::this_thread::get_id()).str()};
+                        % log_path_).str()};
             log_func_(msg);
         }
         stop();
