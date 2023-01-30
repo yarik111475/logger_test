@@ -1,196 +1,494 @@
 #include "LogController.h"
-#include "settings/Settings.h"
+#include "settings/LogSettings.h"
 
+#include <ctime>
 #include <boost/format.hpp>
 #include <boost/process.hpp>
 #include <boost/convert.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/bind/bind.hpp>
+#include <boost/date_time.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/date_time.hpp>
-
-void LogController::run()
-{
-    while(start_stop_flag_){
-        std::unique_lock<std::mutex> lock(mtx_);
-        cv_.wait(lock, [this](){
-            return !task_queue_.empty();
-        });
-
-        //task_queue_.front();
-        task_queue_.pop();
-        lock.unlock();
-
-        if(!start_stop_flag_){
-            return;
-        }
-
-        execute_task();
-    }
-}
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/local_time_adjustor.hpp>
+#include <boost/date_time/c_local_time_adjustor.hpp>
 
 void LogController::tick(const boost::system::error_code &ec)
 {
-    emplace_task();
+    //execute all needed operations
+    execute_task();
+    //restart timer
     timer_ptr_->expires_from_now(boost::posix_time::milliseconds(interval_));
     timer_ptr_->async_wait(std::bind(&LogController::tick,this,std::placeholders::_1));
-}
-
-void LogController::emplace_task()
-{
-    std::lock_guard<std::mutex> lock(mtx_);
-    task_queue_.emplace('0');
-    cv_.notify_one();
+    if(log_func_){
+        const std::string& msg {"LogController::tick()"};
+        //log_func_(msg);
+    }
 }
 
 void LogController::execute_task()
 {
+    //check if 'path' for log files exists
     const boost::filesystem::path path {log_path_};
     if(!boost::filesystem::exists(path)){
+        //log
         if(log_func_){
-            log_func_((boost::format("LogController::execute_task():path '%1%' not exists!")
-                                    % path).str());
+            const std::string& msg {(boost::format("LogController::execute_task(): path %1% not exists!")
+                        % std::this_thread::get_id()).str()};
+            log_func_(msg);
         }
         stop();
         return;
     }
+
+    //try to rename found files
+    try{
+        rename_files(log_path_);
+    }
+    catch(const std::exception& ex){
+        //log
+        if(log_func_){
+            const std::string& msg {(boost::format("LogController::rename_files(): exception '%1%'")
+                        % ex.what()).str()};
+            log_func_(msg);
+        }
+    }
+    catch(...){
+        //log
+        if(log_func_){
+            const std::string& msg {"LogController::rename_files(): unknown exception"};
+            log_func_(msg);
+        }
+    }
+
+    //try to copy with renaming found files
+    try{
+        //copy_files(log_path_);
+    }
+    catch(const std::exception& ex){
+        //log
+        if(log_func_){
+            const std::string& msg {(boost::format("LogController::copy_files(): exception '%1%'")
+                        % ex.what()).str()};
+            log_func_(msg);
+        }
+    }
+    catch(...){
+        //log
+        if(log_func_){
+            const std::string& msg {"LogController::copy_files(): unknown exception"};
+            log_func_(msg);
+        }
+    }
+
+    //try to compress found files
+    try{
+        compress_files(log_path_);
+    }
+    catch(const std::exception& ex){
+        //log
+        if(log_func_){
+            const std::string& msg {(boost::format("LogController::compress_files(): exception '%1%'")
+                        % ex.what()).str()};
+            log_func_(msg);
+        }
+    }
+    catch(...){
+        //log
+        if(log_func_){
+            const std::string& msg {"LogController::compress_files(): unknown exception"};
+            log_func_(msg);
+        }
+    }
+
+    //try to remove found zips
+    try{
+        remove_zips(log_path_);
+    }
+    catch(const std::exception& ex){
+        //log
+        if(log_func_){
+            const std::string& msg {(boost::format("LogController::remove_zips(): exception '%1%'")
+                        % ex.what()).str()};
+            log_func_(msg);
+        }
+    }
+    catch(...){
+        //log
+        if(log_func_){
+            const std::string& msg {"LogController::remove_zips(): unknown exception"};
+            log_func_(msg);
+        }
+    }
+
+    //try to remove found files
+    try{
+        //remove_files(log_path_);
+    }
+    catch(const std::exception& ex){
+        //log
+        if(log_func_){
+            const std::string& msg {(boost::format("LogController::remove_files(): exception '%1%'")
+                        % ex.what()).str()};
+            log_func_(msg);
+        }
+    }
+    catch(...){
+        //log
+        if(log_func_){
+            const std::string& msg {"LogController::remove_files(): unknown exception"};
+            log_func_(msg);
+        }
+    }
+}
+
+void LogController::rename_files(const std::string &path)
+{
     boost::filesystem::directory_iterator begin(path);
     boost::filesystem::directory_iterator end;
-    std::map<std::string, std::string> file_map;
+    std::vector<std::pair<std::string,std::string>> file_list {};
 
     //parse directory
     while(begin!=end){
         const auto& status {begin->status()};
         if(status.type()==boost::filesystem::regular_file){
-            const std::string& file_path {begin->path().string()};
-            const std::string file_name {begin->path().filename().string()};
-            file_map.emplace(file_name,file_path);
+            const boost::filesystem::path path_ {begin->path()};
+            const std::string file_path=path_.string();
+            const std::string file_name=path_.filename().string();
+            file_list.push_back({file_name,file_path});
         }
         ++begin;
     }
 
-    //iterate all found files
-    auto map_begin {file_map.begin()};
-    while(map_begin!=file_map.end()){
-        const std::string& file_name {map_begin->first};
-        const std::string& file_path {map_begin->second};
+    //rename all found files
+    for(size_t i=0;i<file_list.size();++i){
+        const std::string file_name {file_list.at(i).first};
+        const std::string file_path {file_list.at(i).second};
 
-        //try to rename file
-        rename_file(file_name,file_path);
-        //try to compress file
-        compress_file(file_name,file_path);
-        //try to remove file
-        remove_file(file_name,file_path);
+        const boost::filesystem::path path_(file_path);
+        const std::string& file_extension {path_.extension().string()};
 
-        ++map_begin;
-    }
+        //check extension
+        if(file_extension!=".txt"){
+            continue;
+        }
 
-    const std::string& msg {"LogController::execute_task(): task executed"};
-    if(log_func_){
-        log_func_(msg);
-    }
-}
+        //check file_name parts
+        std::vector<std::string> split_results;
+        boost::split(split_results, file_name, boost::is_any_of("."));
+        if(split_results.empty() || split_results.size()!=3){
+            continue;
+        }
 
-void LogController::rename_file(const std::string &file_name, const std::string &file_path)
-{
-    if(log_func_){
-        const std::string& msg {(boost::format("LogController::rename_file(): try to rename file: '%1%', path: '%2%'")
-                    % file_name
-                    % file_path).str()};
-        log_func_(msg);
-    }
-
-
-    boost::char_separator<char> sep(".");
-    boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
-    //check tokens count in file_name
-    const size_t tokens_count=std::distance(tokens.begin(),tokens.end());
-    if(tokens_count==token_size_){
-
-    }
-}
-
-void LogController::compress_file(const std::string &file_name, const std::string &file_path)
-{
-    if(log_func_){
-        const std::string& msg {(boost::format("LogController::compress_file(): try to compress file: '%1%', path: '%2%'")
-                    % file_name
-                    % file_path).str()};
-        log_func_(msg);
-    }
-
-    boost::char_separator<char> sep(".");
-    boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
-    //check tokens count in file_name
-    const size_t tokens_count=std::distance(tokens.begin(),tokens.end());
-    if(tokens_count==token_size_){
-
-    }
-}
-
-void LogController::remove_file(const std::string &file_name, const std::string &file_path)
-{
-    if(log_func_){
-        const std::string& msg {(boost::format("LogController::remove_file(): try to remove file: '%1%', path: '%2%'")
-                    % file_name
-                    % file_path).str()};
-        log_func_(msg);
-    }
-
-    boost::char_separator<char> sep(".");
-    boost::tokenizer<boost::char_separator<char>> tokens(file_name,sep);
-    //check tokens count in file_name
-    const size_t tokens_count=std::distance(tokens.begin(),tokens.end());
-    if(tokens_count==token_size_){
-
-    }
-}
-
-void LogController::operate_file(const std::string &file_name, const std::string &file_path)
-{
-    if(log_func_){
-        const std::string& msg {(boost::format("LogController::operate_file(): operate with file: '%1%', path: '%2%'")
-                    % file_name
-                    % file_path).str()};
-        log_func_(msg);
-    }
-
-    //full compressor path with file_name
-    const std::string& compressor_full_path {compressor_path_ +"/" + compressor_name_};
-
-    //check if compressor exists
-    if(!boost::filesystem::exists(compressor_full_path)){
+        //log
         if(log_func_){
-            const std::string& msg {(boost::format("LogController::operate_file(): compressor not exists', path: '%1%'")
-                        % compressor_full_path).str()};
+            const std::string& msg {(boost::format("LogController::rename_files(): file: '%1%', path: '%2%'")
+                                                   % file_name
+                                                   % file_path).str()};
             log_func_(msg);
         }
-        return;
+
+        //get 'last_write_time' timestamp for file
+        const std::time_t& dt {boost::filesystem::last_write_time(file_path)};
+        boost::posix_time::ptime ptime_=boost::posix_time::from_time_t(dt);
+        ptime_=boost::date_time::c_local_adjustor<boost::posix_time::ptime>::utc_to_local(ptime_);
+        const boost::gregorian::date date_ {ptime_.date()};
+
+        //create new file name for save file
+        const std::string& new_file_name {boost::posix_time::to_iso_string(ptime_)};
+
+        /*
+        //create new file name for save file
+        const std::string& new_file_name_str {(boost::format("%4d-%02d-%02dT%02d_%02d_%02d")
+                    % date_.year()
+                    % date_.month().as_number()
+                    % date_.day()
+                    % ptime_.time_of_day().hours()
+                    % ptime_.time_of_day().minutes()
+                    % ptime_.time_of_day().seconds()).str()};
+        */
+
+        //create path for save file
+        boost::filesystem::path new_path_(file_path);
+        new_path_=new_path_.remove_filename();
+        const std::string& new_path_str {new_path_.string()};
+
+        //rename file with 'last_write_time' timestamp
+        boost::system::error_code ec;
+        boost::filesystem::rename(file_path, new_path_str + "/" + new_file_name + ".txt",ec);
+        if(ec!=boost::system::errc::success){
+            //TODO log error here
+        }
+    }
+}
+
+void LogController::copy_files(const std::string &path)
+{
+    boost::filesystem::directory_iterator begin(path);
+    boost::filesystem::directory_iterator end;
+    std::vector<std::pair<std::string,std::string>> file_list {};
+
+    //parse directory
+    while(begin!=end){
+        const auto& status {begin->status()};
+        if(status.type()==boost::filesystem::regular_file){
+            const boost::filesystem::path path_ {begin->path()};
+            const std::string file_path=path_.string();
+            const std::string file_name=path_.filename().string();
+            file_list.push_back({file_name,file_path});
+        }
+        ++begin;
     }
 
-    //create result compressed files path
-    boost::filesystem::path out_path(file_path);
-    out_path=out_path.remove_filename();
+    //copy with renaming all found files
+    for(size_t i=0;i<file_list.size();++i){
+        const std::string file_name {file_list.at(i).first};
+        const std::string file_path {file_list.at(i).second};
 
-    const std::string& compressor_args {" a -y " + out_path.string() + "/" + file_name + ".zip "  + file_path};
-    const int& result {boost::process::system(compressor_full_path +compressor_args)};
+        const boost::filesystem::path path_(file_path);
+        const std::string& file_extension {path_.extension().string()};
+
+        //check extension
+        if(file_extension!=".txt"){
+            continue;
+        }
+
+        //check file_name parts
+        std::vector<std::string> split_results;
+        boost::split(split_results, file_name, boost::is_any_of("."));
+        if(split_results.empty() || split_results.size()!=3){
+            continue;
+        }
+
+        //log
+        if(log_func_){
+            const std::string& msg {(boost::format("LogController::copy_files(): file: '%1%', path: '%2%'")
+                                                   % file_name
+                                                   % file_path).str()};
+            log_func_(msg);
+        }
+
+        //get 'last_write_time' timestamp for file
+        const std::time_t& dt {boost::filesystem::last_write_time(file_path)};
+        boost::posix_time::ptime ptime_=boost::posix_time::from_time_t(dt);
+        ptime_=boost::date_time::c_local_adjustor<boost::posix_time::ptime>::utc_to_local(ptime_);
+        const boost::gregorian::date date_ {ptime_.date()};
+
+        //create new file name for copy file
+        const std::string& new_file_name {boost::posix_time::to_iso_string(ptime_)};
+
+        /*
+        //create new file name for save file
+        const std::string& new_file_name_str {(boost::format("%4d-%02d-%02dT%02d_%02d_%02d")
+                    % date_.year()
+                    % date_.month().as_number()
+                    % date_.day()
+                    % ptime_.time_of_day().hours()
+                    % ptime_.time_of_day().minutes()
+                    % ptime_.time_of_day().seconds()).str()};
+        */
+
+        //create path for copy file
+        boost::filesystem::path new_path_(file_path);
+        new_path_=new_path_.remove_filename();
+        const std::string& new_path_str {new_path_.string()};
+
+        //copy file with 'last_write_time' timestamp
+        boost::system::error_code ec;
+        boost::filesystem::copy_file(file_path, new_path_str + "/" + new_file_name + ".txt",ec);
+        if(ec!=boost::system::errc::success){
+            //TODO log error here
+        }
+    }
+}
+
+void LogController::compress_files(const std::string &path)
+{
+    boost::filesystem::directory_iterator begin(path);
+    boost::filesystem::directory_iterator end;
+    std::vector<std::pair<std::string,std::string>> file_list {};
+
+    //parse directory
+    while(begin!=end){
+        const auto& status {begin->status()};
+        if(status.type()==boost::filesystem::regular_file){
+            const boost::filesystem::path path_ {begin->path()};
+            const std::string file_path=path_.string();
+            const std::string file_name=path_.filename().string();
+            file_list.push_back({file_name,file_path});
+        }
+        ++begin;
+    }
+
+    //compress all found files
+    for(size_t i=0;i<file_list.size();++i){
+        const std::string file_name {file_list.at(i).first};
+        const std::string file_path {file_list.at(i).second};
+
+        const boost::filesystem::path path_(file_path);
+        const std::string file_name_=path_.stem().string();;
+        const std::string& file_extension_ {path_.extension().string()};
+
+        //check file_name prefix
+        if(boost::algorithm::starts_with(file_name_, "usagent")){
+            continue;
+        }
+
+        //check extension
+        if(file_extension_!=".txt"){
+            continue;
+        }
+
+        //check file_name parts
+        std::vector<std::string> split_results;
+        boost::split(split_results, file_name,boost::is_any_of("."));
+        if(split_results.empty() || split_results.size()!=2){
+            continue;
+        }
+        //log
+        if(log_func_){
+            const std::string& msg {(boost::format("LogController::compress_files(): file: '%1%', path: '%2%'")
+                                                   % file_name
+                                                   % file_path).str()};
+            log_func_(msg);
+        }
+
+        //create path for save file
+        boost::filesystem::path current_path(file_path);
+        current_path=current_path.remove_filename();
+        //create program
+        const boost::filesystem::path& program {compressor_path_ + "/" + compressor_name_};
+        //create args
+        std::vector<std::string> args {
+            "a", "-y", "-sdel", "-mx9", current_path.string() + "/" + split_results.at(0) + ".zip", file_path
+        };
+        //execute compress
+        const int& success {boost::process::system(program, args)};
+    }
+}
+
+void LogController::remove_zips(const std::string &path)
+{
+    boost::filesystem::directory_iterator begin(path);
+    boost::filesystem::directory_iterator end;
+    std::vector<std::pair<std::string,std::string>> file_list {};
+
+    //parse directory
+    while(begin!=end){
+        const auto& status {begin->status()};
+        if(status.type()==boost::filesystem::regular_file){
+            const boost::filesystem::path path_ {begin->path()};
+            file_list.push_back({path_.string(),path_.filename().string()});
+        }
+        ++begin;
+    }
+
+    //remove all found files
+    for(size_t i=0;i<file_list.size();++i){
+        const std::string file_name {file_list.at(i).first};
+        const std::string file_path {file_list.at(i).second};
+
+        const boost::filesystem::path path_(file_path);
+        const std::string base_file_name_=path_.stem().string();;
+        const std::string& file_extension_ {path_.extension().string()};
+
+        //check extension
+        if(".zip"!=file_extension_){
+            continue;
+        }
+
+        //create date and time from file_name
+        const boost::posix_time::ptime& file_ptime_ {boost::posix_time::from_iso_string(base_file_name_)};
+        const boost::gregorian::date& file_date_ {file_ptime_.date()};
+
+        //create local now date
+        const boost::gregorian::date& now_date_ {boost::posix_time::second_clock::local_time().date()};
+
+        //get days delta
+        boost::gregorian::date_duration days_delta {now_date_-file_date_};
+
+        //get days offset from log settings
+        long days_offset {9};
+        const bool& date_offset_ok {boost::conversion::try_lexical_convert<long>(log_settings_ptr_->value("log.remove_period"), days_offset)};
+
+        //compare days delta and days offset
+        if(days_delta.days() > days_offset){
+            boost::system::error_code ec;
+            const bool& success {boost::filesystem::remove(file_path,ec)};
+            if(!success){
+                //TODO log error here
+            }
+        }
+    }
+}
+
+void LogController::remove_files(const std::string &path)
+{
+    boost::filesystem::directory_iterator begin(path);
+    boost::filesystem::directory_iterator end;
+    std::vector<std::pair<std::string,std::string>> file_list {};
+
+    //parse directory
+    while(begin!=end){
+        const auto& status {begin->status()};
+        if(status.type()==boost::filesystem::regular_file){
+            const boost::filesystem::path path_ {begin->path()};
+            file_list.push_back({path_.string(),path_.filename().string()});
+        }
+        ++begin;
+    }
+
+    //remove all found files
+    for(size_t i=0;i<file_list.size();++i){
+        const std::string file_name {file_list.at(i).first};
+        const std::string file_path {file_list.at(i).second};
+
+        const boost::filesystem::path path_(file_path);
+        const std::string base_file_name_=path_.stem().string();;
+        const std::string& file_extension_ {path_.extension().string()};
+
+        //check extension
+        if(".txt"!=file_extension_){
+            continue;
+        }
+
+        //check file_name parts
+        std::vector<std::string> split_results;
+        boost::split(split_results, file_name, boost::is_any_of("."));
+        if(split_results.empty() || split_results.size()!=2){
+            continue;
+        }
+
+        //create date and time from file_name
+        const boost::posix_time::ptime& file_ptime_ {boost::posix_time::from_iso_string(base_file_name_)};
+        const boost::gregorian::date& file_date_ {file_ptime_.date()};
+
+        //create local now date
+        const boost::gregorian::date& now_date_ {boost::posix_time::second_clock::local_time().date()};
+
+        //get days delta
+        boost::gregorian::date_duration days_delta {now_date_-file_date_};
+
+        //get days offset from log settings
+        long days_offset {9};
+        const bool& date_offset_ok {boost::conversion::try_lexical_convert<long>(log_settings_ptr_->value("log.remove_period"), days_offset)};
+
+        //compare days delta and days offset
+        if(days_delta.days() > days_offset){
+            boost::system::error_code ec;
+            const bool& success {boost::filesystem::remove(file_path,ec)};
+            if(!success){
+                //TODO log error here
+            }
+        }
+    }
 }
 
 LogController::LogController(std::shared_ptr<Settings> log_settings_ptr, const std::string &log_path, const std::string &compressor_path)
     :log_settings_ptr_{log_settings_ptr},log_path_{log_path},compressor_path_{compressor_path}
 {
-    //create check period
-    const bool& interval_ok {boost::conversion::try_lexical_convert<int>(log_settings_ptr_->value("log.check_period"),interval_)};
-    if(!interval_ok){
-        interval_=1000;
-    }
-    //crete log filename
-    const bool filename_ok {boost::conversion::try_lexical_convert<std::string>(log_settings_ptr->value("log.file_name"),log_file_name_)};
-    if(!filename_ok){
-        log_file_name_="log.txt";
-    }
 }
 
 LogController::~LogController()
@@ -203,13 +501,6 @@ void LogController::start()
     if(started_){
         stop();
     }
-    std::lock_guard<std::mutex> lock(mtx_);
-    start_stop_flag_=true;
-
-    //start task queue thread
-    queue_thread_ptr_.reset(new std::thread([this](){
-        run();
-    }));
 
     timer_ptr_.reset(new boost::asio::deadline_timer(io_service_,boost::posix_time::milliseconds(interval_)));
     boost::system::error_code ec;
@@ -221,8 +512,9 @@ void LogController::start()
     }));
 
     started_=true;
-    const std::string& msg {"LogController::start(): started"};
+
     if(log_func_){
+        const std::string& msg {"LogController::start()"};
         log_func_(msg);
     }
 }
@@ -238,19 +530,9 @@ void LogController::stop()
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
-    std::lock_guard<std::mutex> lock(mtx_);
-    start_stop_flag_=false;
-    task_queue_.emplace('0');
-    cv_.notify_one();
-
-    if(queue_thread_ptr_ && queue_thread_ptr_->joinable()){
-        queue_thread_ptr_->detach();
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-
     started_=false;
-    const std::string& msg {"LogController::stop(): stopped"};
     if(log_func_){
+        const std::string& msg {"LogController::stop()"};
         log_func_(msg);
     }
 }

@@ -33,7 +33,6 @@ MainWidget::MainWidget(QWidget *parent):QWidget{parent}
 
     log_settings_ptr_.reset(new LogSettings(log_path_ + "/" + settings_filename_));
     log_settings_ptr_->read_settings();
-    log_settings_ptr_->set_value("log.level", "debug");
 
     const time_t time=boost::filesystem::creation_time(log_path_ + "/" + settings_filename_);
     boost::posix_time::ptime pt=boost::posix_time::from_time_t(time);

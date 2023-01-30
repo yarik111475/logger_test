@@ -32,15 +32,29 @@ private:
     std::shared_ptr<std::thread> asio_thread_ptr_ {nullptr};
     std::shared_ptr<boost::asio::deadline_timer> timer_ptr_ {nullptr};
 
+    //timer operations
     void tick(const boost::system::error_code& ec);
     void execute_task();
 
     //file operations
-    void rename_file(const std::string& file_name,const std::string& file_path);
-    void compress_file(const std::string& file_name,const std::string& file_path);
+    void rename_files(const std::string& path);
+    void compress_files(const std::string& path);
     void remove_file(const std::string& file_name,const std::string& file_path);
 
+    //inner logger initialization
+    void init_logger();
+
 public:
+    enum log_level{
+        trace,
+        debug,
+        info,
+        warn,
+        err,
+        critical,
+        off
+    };
+
     explicit Controller(std::shared_ptr<Settings> log_settings_ptr, const std::string& log_path, const std::string& compressor_path);
     inline void set_log_func(std::function<void(const std::string& msg)> log_func){
         log_func_=log_func;
@@ -49,6 +63,7 @@ public:
 
     void start();
     void stop();
+    void write_log(log_level level, const std::string& msg);
 };
 
 #endif // CONTROLLER_H

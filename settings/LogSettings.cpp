@@ -8,9 +8,8 @@ void LogSettings::init_default()
         {"log.compress_period", "0"},
         {"log.remove_period","0"},
         {"log.check_period", "5000"},
-        {"log.files_count", "3"},
-        {"log.file_size", "1024"},
-        {"log.file_name", "log.txt"},
+        {"log.file_name", "usagent.txt"},
+        {"files_count", "3"},
         {"log.level", "trace"}
     };
     for(const auto& pair:default_map){
